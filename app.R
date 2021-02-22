@@ -13,37 +13,34 @@ ui <- dashboardPage(
   ),
   dashboardBody(
     tags$h2("K-means clustering with random data"),
-    fluidRow(column(5, 
-      wellPanel(
+    fluidRow(
+      column(5, wellPanel(
         sliderInput(inputId = "num",
                   label = "How many random data points?",
                   min = 100, max = 1000, value = 500),
         sliderInput(inputId = "centroids",
                     label = "How many centroids for the random data?",
                     min = 1, max = 5, value = 2),
-        sliderInput(inputId = "clusters",
+        sliderInput(inputId = "km_clusters",
                     label = "How many clusters for k-means?",
                     min = 1, max = 5, value = 2),
         switchInput(
-          inputId = "clusters",
-          label = "Show clusters", 
-          labelWidth = "120px"
-        ),
+          inputId = "show_clusters",
+          label = "Show assigned clusters", 
+          labelWidth = "160px"),
         actionButton(
-          inputId = "new_data", label = "Generate new data"
-        ),
+          inputId = "new_data", label = "Generate new data"),
         actionButton(
-          inputId = "kmeans", label = "Run k-means clustering"
-        )
-      )
-    )),
-    fluidRow(
-      column(6, plotOutput("scat"))
-      )
-      )
+          inputId = "kmeans", label = "Run k-means clustering")
+      )),
+      column(7, plotOutput("scat"))
+    )
+  )
 )
 
-server <- function(input, output) {
+color_pal <- c("#6551E8", "#6ED8CC", "#E9C46A", "#490838", "#E76F51")
+
+server <- function(input, output, session) {
     # Generate random data from user input when user presses "run" button
     rand_data <- reactive({
       # Rerun this when user presses "new_data" button
@@ -109,14 +106,14 @@ server <- function(input, output) {
   })
   
   toggle_clustering_view <- function() {
-    if (input$clusters) {
+    if (input$show_clusters) {
       output$scat <- renderPlot({
         rand_data() %>% 
           ggplot() +
           aes(x, y, color = clusters) +
           geom_point() +
           scale_color_manual(
-            values = brewer.pal(n = input$centroids, name = "Dark2")
+            values = color_pal
           ) +
           labs(color = "Clusters", x = "", y = "")
       })
@@ -135,13 +132,31 @@ server <- function(input, output) {
     toggle_clustering_view()
   })
   
-  observeEvent(input$clusters, {
+  observeEvent(input$show_clusters, {
     toggle_clustering_view()
   })
   
   observeEvent(input$kmeans, {
+    # Toggle show clusters switch to off if on
+
     
-  })
+    df <- rand_data() %>% 
+      select(x, y)
+    
+    km_data <- kmeans(df, centers = input$km_clusters, nstart = 25)
+
+    output$scat <- renderPlot({
+      df %>% 
+        mutate(km_clusters = km_data$cluster) %>% 
+        ggplot() +
+        aes(x, y, color = factor(km_clusters)) +
+        geom_point() +
+        scale_color_manual(
+          values = color_pal
+        ) +
+        labs(color = "K-means Clusters", x = "", y = "")
+      })
+    })
   
 
 }
